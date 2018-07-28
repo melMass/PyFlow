@@ -1,74 +1,75 @@
-                Разработка абстрактной модели графа зависимости, её визуализация и применение.
+                Development of an abstract graph model of dependence, its visualization and application.
 
 
-1. Предисловие Приветствие
-2. Принципы работы
-3. Правила подключения
-4. События графа
-5. Визуализация
-6. Области применения
+1. Preface Greeting
+2. Principles of work
+3. Connection rules
+4. Graph events
+5. Visualization
+6. Applications
 
 
-1. Предисловие
+1. Foreword
 
-    Всем привет, в этой статье я хочу рассказать о разработке нодового виджета на PySide, о том с какими проблемами мне пришлось столкнуться и как я их решал.
+    Hello, in this article I want to talk about the development of a nod widget on PySide, about what problems I had to face and how I solved them.
 
-    Для ясности расскажу немного о истоках. О том, что же такое граф мы можем узнать из математической теории графов, это раздел дисркетной математики основным объектом изучения которой и являются графы. Граф - это совокупность вершин соединенных ребрами. Графы могут быть направленными, ненаправленными, смешанными и изоморфными. Что касается терминологии сразу хочу сказать что у теории графов она еще не устоялась, и в разных публикациях под одними и теми же терминами могут пониматься разные вещи. Вершины мы будем называть "нодами" (нода), ребра - "связями" (связь). В нашем случае мы рассмотрим ациклический направленный граф (DAG). Это такой граф в котором отсутствуют направленные циклы, то есть пути, начинающиеся и кончающиеся в одной и той же вершине.
-
-
+    For clarity, I will tell a little about the origins. About what the graph can be learned from the mathematical theory of graphs, this is the section of discrete mathematics whose main object of study is graphs. A graph is a collection of vertices connected by edges. Graphs can be directional, non-directional, mixed and isomorphic. As for the terminology, I just want to say that the theory of graphs has not yet settled, and in different publications the same terms can mean different things. We will call the vertices "nodes" (nodes), edges - "connections" (connection). In our case, we consider an acyclic directed graph (DAG). This is a graph in which there are no directed cycles, that is, paths that begin and end at the same vertex.
 
 
-                                                Принципы.
-
-1) У каждой ноды есть входные и выходные порты, и есть "мозг" - функция "compute", которая запрашивает данные у входных портов, производит какие-то вычисления а затем записывает результат в выходные порты.
-
-2) Нода не должна знать ничего из окружающей среды и никогда не использует даные которые являются для нее внешними. Все что она знает это свои входные и выходные порты и может запрашивать у них данные или записывать их через функцию compute.
-
-    У ноды есть входные и выходные порты, в каждом порте есть данные с предыдущего просчета. В случае если порт будет отсоединен и останется в изоляции, алгоритм использующий данные возьмет значение с предыдущего просчета.
-
-3) У каждого порта должно быть бинарное свойство dirty. И служебные списки кто на кого влияет. Для установления этих зависимостей должна вызываться функция pinAffects.
-
-    Например если это выходной порт ноды "А", то на него будет влиять какой-то входной порт этой ноды. А в момент соединения с нодой "Б" аутпут "А" станет влиять на какой-то инпут ноды "Б", и т.д. реализуя связи между входными и выходными портами нод. На основе таких связей будет работать механизм dirty propogation для оптимального пересчета графа.
-
-4) Выходные порты выдают информацию только если у них спросить (getData). (lazy evaluation)
-
-5) Данные запрещается читать\писать на прямую внутри функции compute, для этого существуют специальные методы getData, setData. Хотя например в методе отображения графа plot мы обращаемся к данным на прямую, чтобы распечатать их значение в данный момент, не вызывая при этом getData и не задействуя механизм dirty_propagation.
-
-6) Compute методы вызываются единожды для каждой ноды по глубине начиная с конца графа, учитывая dirty флаги. Информацию о том в каком порядке вызывать комьют для блока должен знать граф, и её можно получить скормив мутоду ноду. Нужно учесть ситуацию ненаправленных циклов.
-
-7) Ноды одного уровня не зависят друг от друга и вычисляются параллельно или последовательно на выбор. Когда все ноды одного уровня просчитаны, начинают вычисляться ноды следующего уровня, и т.д. до конца.
-
-8) Порты будут разделяться по типам данных с которыми работают. Нельзя соединить порты несовместимых типов данных.
 
 
-                                                Правила.
+                                                Principles.
 
-- Подключены могут быть только порты разного типа (входной и выходной) с совместимыми типами данных.
-- Входной порт может принимать только одну связь.
-- Выходной порт может связываться со многими.
-- Входной порт не может принимать значение с выходного порта собственной ноды. (Циклических нод нет)
-- Когда пишем "особые"" ноды, у которых пины могут быть добавлены в рантайме или нужно хранить что-то уникальное, нужно описать как сохранять и загружать такие ноды. Например массивы или sequence нода, или коммент нода. (см. исходники)
+1) Each node has input and output ports, and there is a "brain" - the function "compute", which requests data from the input ports, performs some calculations and then writes the result to the output ports.
+
+2) Noda should not know anything from the environment and never uses data that is external to her. All that she knows is her input and output ports and can request data from them or write them through the compute function.
+
+    The node has input and output ports, each port has data from the previous rendering. In the event that the port is disconnected and remains in isolation, the algorithm using the data will take the value from the previous rendering.
+
+3) Each port must have a binary dirty property. And service lists who influences whom. To establish these dependencies, the pinAffects function must be called.
+
+    For example, if this is the output port of node "A", then it will be affected by some input port of this node. And at the moment of connection with the node "B", the out-port "A" will affect some kind of input nodes "B", etc. realizing the connection between the input and output ports of nodes. On the basis of such connections, the mechanism of dirty propogation will work for the optimal recalculation of the graph.
+
+4) Output ports provide information only if they ask (getData). (lazy evaluation)
+
+5) The data is forbidden to read / write to the line inside the compute function, there are special methods for this, getData, setData. Although, for example, in the graph plot mapping method, we access the data in a straight line to print out their value at the moment, without causing getData and not using the dirty_propagation mechanism.
+
+6) Compute methods are called once for each node in depth from the end of the graph, taking into account dirty flags. Information about the order in which to call a comet for a block must be known to the graph, and it can be obtained by feeding the method to the node. It is necessary to take into account the situation of non-directional cycles.
+
+7) Nodes of the same level do not depend on each other and are calculated in parallel or sequentially to choose. When all nodes of the same level are calculated, the next level nodes are calculated, etc. to end.
+
+8) Ports will be divided according to the types of data they work with. You can not connect ports of incompatible data types.
 
 
-                                            Описание событий.
+                                                Rules.
 
-1) Выходной порт ноды "А" соеденился с входным портом ноды "Б".
+- Only ports of different types (input and output) with compatible data types can be connected.
+- The input port can only accept one link.
+- The output port can communicate with many.
+- The input port can not take a value from the output port of its own node. (Cyclic nodes are not present)
+- When we write "special" nodes, in which the pins can be added in runtime, or you need to store something unique, you need to describe how to store and load such nodes, for example arrays or a node sequence, or a node comment. see the source code)
 
-    В этот момент заполнятся списки влияния.
-    Заполняются списки графа.
-    Создается связь. (графически - линия соединяющая порты)
-    Данные из выходного порта ноды "А" записались во входной порт ноды "Б".
-    Расставляются dirty флаги.
 
-2) Связь между портами разорвалась.
+                                            Description of the events
 
-    Редактируются списки влияния.
-    Удаляется связь.
+1) The output port of the node "A" is connected to the input port of the node "B."
 
-3) Изменилось значения инпут порта ноды.
+    At this moment, the lists of influence are filled in. Thefilled in
+    lists of the graph are.
+    A connection is created (graphically - the line connecting the ports).
+    Data from the output port of the node "A" registered in the input port of node "B."
+    Dirty flags are placed
 
-    В этот момент по служебным спискам портов кто на кого влияет выставляются флаги dirty вверх до конца графа, начиная с порта в котором изменились данные.
+2) Sv ide between ports exploded.
 
-4) Порт запраштвает данные.
-    
-    Проверяется dirty флаг, если true то у графа запрошивается порядок пересчета нод, и они пересчитываются. Если false, берутся данные с последнего просчета.
+    are edited lists of influence.
+    remove the links.
+
+3) Change the value of INPUT node port.
+
+    At this point, on official lists ports who influences whom exhibited dirty flags up to the end of the count, starting from the port where the data is changed.
+
+4) Port zaprasht data.
+
+    The dirty flag is checked, if true, then the graph prompts for the counting of the nodes, and they are recalculated. If false, the data from the last rendering is taken.
+
